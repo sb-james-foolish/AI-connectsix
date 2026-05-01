@@ -11,6 +11,7 @@ const state = {
   selected: [],
   analysis: null,
   lastBotMove: null,
+  showHeatmap: false,
 };
 
 const els = {
@@ -18,6 +19,7 @@ const els = {
   gameStatus: document.getElementById("gameStatus"),
   selectionText: document.getElementById("selectionText"),
   submitMoveBtn: document.getElementById("submitMoveBtn"),
+  heatmapToggle: document.getElementById("heatmapToggle"),
   newGameBtn: document.getElementById("newGameBtn"),
   undoBtn: document.getElementById("undoBtn"),
   exportBtn: document.getElementById("exportBtn"),
@@ -138,8 +140,8 @@ function isStarPoint(x, y) {
 }
 
 function renderBoard() {
-  const heat = heatMap();
-  const recommended = recommendationSet();
+  const heat = state.showHeatmap ? heatMap() : new Map();
+  const recommended = state.showHeatmap ? recommendationSet() : new Set();
   const selected = selectedSet();
   const bot = lastBotSet();
   els.board.innerHTML = "";
@@ -170,6 +172,11 @@ function renderBoard() {
       els.board.appendChild(cell);
     }
   }
+}
+
+function renderModeToggle() {
+  els.heatmapToggle.classList.toggle("active", state.showHeatmap);
+  els.heatmapToggle.setAttribute("aria-pressed", state.showHeatmap ? "true" : "false");
 }
 
 function selectCell(x, y) {
@@ -421,6 +428,7 @@ function renderJson() {
 }
 
 function render() {
+  renderModeToggle();
   renderBoard();
   renderStatus();
   renderOverview();
@@ -539,6 +547,10 @@ function bindTabs() {
 }
 
 els.submitMoveBtn.addEventListener("click", submitMove);
+els.heatmapToggle.addEventListener("click", () => {
+  state.showHeatmap = !state.showHeatmap;
+  render();
+});
 els.newGameBtn.addEventListener("click", newGame);
 els.undoBtn.addEventListener("click", undo);
 els.exportBtn.addEventListener("click", exportJson);
