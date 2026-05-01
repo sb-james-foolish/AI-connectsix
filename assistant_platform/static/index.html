@@ -3,28 +3,33 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>六子棋全息AI对战辅助平台</title>
+    <title>弈局 - 六子棋国风AI复盘平台</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <canvas id="spaceCanvas" class="space-canvas" aria-hidden="true"></canvas>
+    <div class="ink-backdrop" aria-hidden="true"></div>
     <div class="scanlines" aria-hidden="true"></div>
 
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark"></span>
+          <span class="brand-mark" aria-hidden="true"></span>
           <div>
-            <h1>六子棋全息AI对战辅助平台</h1>
-            <p id="gameStatus">黑棋先手 · HUD LINK ONLINE</p>
+            <div class="brand-row">
+              <h1>弈局</h1>
+              <span class="brand-seal" aria-hidden="true">局</span>
+            </div>
+            <p>六子棋国风AI复盘平台</p>
+            <p id="gameStatus">黑棋先手 · 宣纸棋案已启</p>
           </div>
         </div>
         <div class="top-actions">
-          <button id="newGameBtn" type="button">新局</button>
-          <button id="undoBtn" type="button">悔棋</button>
-          <button id="reportBtn" type="button">导出复盘</button>
-          <button id="exportBtn" type="button">导出JSON</button>
-          <button id="importBtn" type="button">导入日志</button>
+          <button id="newGameBtn" type="button"><span class="action-icon" aria-hidden="true">○</span><span>新局</span></button>
+          <button id="undoBtn" type="button"><span class="action-icon" aria-hidden="true">↶</span><span>悔棋</span></button>
+          <button id="reportBtn" type="button"><span class="action-icon" aria-hidden="true">卷</span><span>导出复盘</span></button>
+          <button id="exportBtn" type="button"><span class="action-icon" aria-hidden="true">册</span><span>导出JSON</span></button>
+          <button id="importBtn" type="button"><span class="action-icon" aria-hidden="true">入</span><span>导入日志</span></button>
           <input id="importFile" type="file" accept="application/json,.json">
         </div>
       </header>
@@ -32,6 +37,14 @@
       <main class="hud-layout">
         <section class="board-zone">
           <div class="board-stage hud-card">
+            <div class="board-stage-bg" aria-hidden="true"></div>
+            <div class="board-stage-header">
+              <div>
+                <span class="eyebrow">中央棋盘主区</span>
+                <strong>15×15 桐木棋盘 · 朱砂星位 · 落子墨韵</strong>
+              </div>
+              <span class="seal-stamp" aria-hidden="true">弈</span>
+            </div>
             <div class="board-tools">
               <button id="heatmapToggle" class="mode-toggle" type="button" aria-pressed="false">AI热力图分析</button>
               <span class="scan-state">SCAN <b></b></span>
@@ -41,7 +54,7 @@
           </div>
           <div class="movebar hud-card">
             <div>
-              <span class="eyebrow">当前落子指令</span>
+              <span class="eyebrow">落子笺</span>
               <strong id="selectionText">选择 1 个落点</strong>
             </div>
             <button id="submitMoveBtn" class="primary" type="button" disabled>提交落子</button>
@@ -49,10 +62,19 @@
         </section>
 
         <aside class="side-panel">
-          <section class="hud-module metrics-module" data-panel="overview">
+          <nav class="tabbar" aria-label="复盘面板切换">
+            <button class="tab active" type="button" data-tab="analysis">分析</button>
+            <button class="tab" type="button" data-tab="knowledge">棋理</button>
+            <button class="tab" type="button" data-tab="profile">画像</button>
+            <button class="tab" type="button" data-tab="replay">复盘</button>
+            <button class="tab" type="button" data-tab="json">JSON</button>
+          </nav>
+
+          <section id="analysisPanel" class="tab-panel active" data-tab="analysis">
+            <section class="hud-module metrics-module" data-panel="overview">
             <div class="module-title">
-              <span>实时对战指标</span>
-              <em>LIVE TELEMETRY</em>
+              <span>实时局势指标</span>
+              <em>CURTAIN</em>
             </div>
             <div class="metrics">
               <div>
@@ -87,27 +109,10 @@
             </div>
           </section>
 
-          <section class="hud-module" data-panel="replay">
-            <div class="module-title">
-              <span>优势曲线实时分析</span>
-              <em>ADVANTAGE CURVE</em>
-            </div>
-            <svg id="replayChart" viewBox="0 0 420 180" role="img" aria-label="复盘优势曲线"></svg>
-          </section>
-
-          <section class="hud-module">
-            <div class="module-title">
-              <span>关键回合拆解</span>
-              <em>TURNING POINTS</em>
-            </div>
-            <div id="turningList" class="list compact-list"></div>
-            <div id="timelineList" class="timeline compact-list"></div>
-          </section>
-
-          <section class="hud-module recommendation-module">
+            <section class="hud-module recommendation-module">
             <div class="module-title">
               <span>复盘报告与落子推荐</span>
-              <em>AI ANALYSIS</em>
+              <em>REPORT</em>
             </div>
             <div class="dual-grid">
               <div>
@@ -125,32 +130,59 @@
             <div id="llmBox" class="llm-box"></div>
           </section>
 
-          <section class="hud-module compact-support" data-panel="profile">
-            <div class="module-title">
-              <span>用户画像与训练建议</span>
-              <em>PLAYER PROFILE</em>
-            </div>
-            <div id="profileSummary" class="profile-summary"></div>
-            <div id="mistakeList" class="list"></div>
-            <div id="trainingList" class="list"></div>
           </section>
 
-          <section class="hud-module compact-support" data-panel="knowledge">
+          <section id="knowledgePanel" class="tab-panel" data-tab="knowledge">
+            <section class="hud-module compact-support" data-panel="knowledge">
             <div class="module-title">
-              <span>RAG棋理与知识图谱</span>
-              <em>TACTICAL GRAPH</em>
+                <span>RAG棋理与知识图谱</span>
+                <em>KNOWLEDGE</em>
             </div>
-            <div id="ragList" class="list"></div>
-            <div id="graphBox" class="graph-box"></div>
+              <div id="ragList" class="list"></div>
+              <div id="graphBox" class="graph-box"></div>
+            </section>
           </section>
 
-          <section class="hud-module compact-support" data-panel="json">
-            <div class="module-title">
-              <span>复盘与棋局数据</span>
-              <em>EXPORT STREAM</em>
-            </div>
-            <textarea id="reportBox" spellcheck="false" readonly></textarea>
-            <textarea id="jsonBox" spellcheck="false" readonly></textarea>
+          <section id="profilePanel" class="tab-panel" data-tab="profile">
+            <section class="hud-module compact-support" data-panel="profile">
+              <div class="module-title">
+                <span>用户画像与训练建议</span>
+                <em>PROFILE</em>
+              </div>
+              <div id="profileSummary" class="profile-summary"></div>
+              <div id="mistakeList" class="list"></div>
+              <div id="trainingList" class="list"></div>
+            </section>
+          </section>
+
+          <section id="replayPanel" class="tab-panel" data-tab="replay">
+            <section class="hud-module" data-panel="replay">
+              <div class="module-title">
+                <span>优势曲线分析</span>
+                <em>INK CURVE</em>
+              </div>
+              <svg id="replayChart" viewBox="0 0 420 180" role="img" aria-label="复盘优势曲线"></svg>
+            </section>
+
+            <section class="hud-module">
+              <div class="module-title">
+                <span>关键回合拆解</span>
+                <em>TACTICS</em>
+              </div>
+              <div id="turningList" class="list compact-list"></div>
+              <div id="timelineList" class="timeline compact-list"></div>
+            </section>
+          </section>
+
+          <section id="jsonPanel" class="tab-panel" data-tab="json">
+            <section class="hud-module compact-support" data-panel="json">
+              <div class="module-title">
+                <span>复盘与棋局数据</span>
+                <em>ARCHIVE</em>
+              </div>
+              <textarea id="reportBox" spellcheck="false" readonly></textarea>
+              <textarea id="jsonBox" spellcheck="false" readonly></textarea>
+            </section>
           </section>
         </aside>
       </main>
