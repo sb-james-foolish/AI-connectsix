@@ -115,6 +115,19 @@
       </main>
     </div>
 
+    <div id="resultOverlay" class="result-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <div class="result-card">
+        <span id="resultBadge" class="result-badge">终局</span>
+        <h2 id="resultTitle">胜利</h2>
+        <p id="resultSubtitle">你赢下了这一局。</p>
+        <p id="resultDetail">复盘报告已经生成，可以查看关键转折和用户画像。</p>
+        <div class="result-actions">
+          <button id="resultNewGameBtn" class="primary" type="button">再来一局</button>
+          <button id="resultReviewBtn" type="button">查看复盘</button>
+        </div>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="/static/app.js"></script>
   </body>

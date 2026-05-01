@@ -44,6 +44,13 @@ const els = {
   timelineList: document.getElementById("timelineList"),
   reportBox: document.getElementById("reportBox"),
   jsonBox: document.getElementById("jsonBox"),
+  resultOverlay: document.getElementById("resultOverlay"),
+  resultBadge: document.getElementById("resultBadge"),
+  resultTitle: document.getElementById("resultTitle"),
+  resultSubtitle: document.getElementById("resultSubtitle"),
+  resultDetail: document.getElementById("resultDetail"),
+  resultNewGameBtn: document.getElementById("resultNewGameBtn"),
+  resultReviewBtn: document.getElementById("resultReviewBtn"),
   toast: document.getElementById("toast"),
 };
 
@@ -105,6 +112,40 @@ function showToast(message) {
   els.toast.classList.add("show");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => els.toast.classList.remove("show"), 2400);
+}
+
+function hideResultOverlay() {
+  els.resultOverlay.classList.add("hidden");
+  els.resultOverlay.classList.remove("victory", "defeat");
+}
+
+function switchTab(tabName) {
+  const target = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  if (!target) return;
+  for (const item of document.querySelectorAll(".tab")) item.classList.remove("active");
+  for (const panel of document.querySelectorAll(".tab-panel")) panel.classList.remove("active");
+  target.classList.add("active");
+  document.getElementById(`${tabName}Panel`).classList.add("active");
+}
+
+function showResultOverlay(winner, humanPlayer) {
+  const won = winner === humanPlayer;
+  const winnerText = playerName(winner);
+  els.resultOverlay.classList.toggle("victory", won);
+  els.resultOverlay.classList.toggle("defeat", !won);
+  els.resultOverlay.classList.remove("hidden");
+  els.resultBadge.textContent = won ? "胜利" : "败北";
+  els.resultTitle.textContent = won ? "胜利" : "败北";
+  els.resultSubtitle.textContent = won
+    ? "你抓住了关键机会，赢下这一局。"
+    : "机器人拿下了这一局，可以回看哪里出现了转折。";
+  const report = state.analysis?.review_report || "";
+  const firstUsefulLine = report
+    .split("\n")
+    .find((line) => line.startsWith("- 当前风险：") || line.startsWith("- 推荐策略："));
+  els.resultDetail.textContent = firstUsefulLine
+    ? `${winnerText}获胜。${firstUsefulLine.replace("- ", "")}`
+    : `${winnerText}获胜。复盘报告已经生成，可以查看关键转折和用户画像。`;
 }
 
 function heatMap() {
@@ -449,9 +490,10 @@ async function refreshAnalysis(includeLlm = true) {
 
 async function submitMove() {
   try {
+    const humanPlayer = state.currentPlayer;
     const data = await api("/api/play", {
       moves: state.moves,
-      player: state.currentPlayer,
+      player: humanPlayer,
       stones: state.selected,
       include_llm: true,
     });
@@ -463,7 +505,7 @@ async function submitMove() {
     state.lastBotMove = data.last_bot_move;
     state.selected = [];
     render();
-    if (state.winner) showToast(`${playerName(state.winner)}获胜`);
+    if (state.winner) showResultOverlay(state.winner, humanPlayer);
   } catch (error) {
     showToast(error.message);
   }
@@ -476,6 +518,7 @@ async function newGame() {
   state.winner = EMPTY;
   state.selected = [];
   state.lastBotMove = null;
+  hideResultOverlay();
   await refreshAnalysis(true);
 }
 
@@ -489,6 +532,7 @@ async function undo() {
   state.winner = EMPTY;
   state.selected = [];
   state.lastBotMove = [...state.moves].reverse().find((move) => move.source === "robot") || null;
+  hideResultOverlay();
   await refreshAnalysis(false);
 }
 
@@ -526,6 +570,7 @@ async function importLog(file) {
     state.analysis = data.analysis;
     state.selected = [];
     state.lastBotMove = [...state.moves].reverse().find((move) => move.source === "robot") || null;
+    hideResultOverlay();
     render();
     showToast("日志已导入");
   } catch (error) {
@@ -537,12 +582,7 @@ async function importLog(file) {
 
 function bindTabs() {
   for (const tab of document.querySelectorAll(".tab")) {
-    tab.addEventListener("click", () => {
-      for (const item of document.querySelectorAll(".tab")) item.classList.remove("active");
-      for (const panel of document.querySelectorAll(".tab-panel")) panel.classList.remove("active");
-      tab.classList.add("active");
-      document.getElementById(`${tab.dataset.tab}Panel`).classList.add("active");
-    });
+    tab.addEventListener("click", () => switchTab(tab.dataset.tab));
   }
 }
 
@@ -555,6 +595,11 @@ els.newGameBtn.addEventListener("click", newGame);
 els.undoBtn.addEventListener("click", undo);
 els.exportBtn.addEventListener("click", exportJson);
 els.reportBtn.addEventListener("click", exportReport);
+els.resultNewGameBtn.addEventListener("click", newGame);
+els.resultReviewBtn.addEventListener("click", () => {
+  hideResultOverlay();
+  switchTab("replay");
+});
 els.importBtn.addEventListener("click", () => els.importFile.click());
 els.importFile.addEventListener("change", () => {
   const file = els.importFile.files?.[0];
