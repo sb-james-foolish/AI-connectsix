@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local runtime output
+competition/competition/.arena/
+competition/competition/result/
+assistant_platform/__pycache__/
+
+# Compiled C/C++ artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+competition/competition/arena
+competition/competition/platform
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db

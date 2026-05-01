@@ -1,0 +1,87 @@
+{
+  "documents": [
+    {
+      "id": "doc-six-priority",
+      "title": "成六与防成六优先级",
+      "phase": "middle",
+      "summary": "六子棋所有形势判断都要先检查直接成六点。若我方有成六点，应优先获胜；若对手有成六点，应优先封堵。",
+      "tags": ["six", "self_win", "opponent_win_next", "critical", "必须防守", "进攻成六", "防守成六"],
+      "concepts": ["six", "must_block", "forcing_move"],
+      "tips": [
+        "先问有没有一手直接成六，再问有没有必须防的对手成六。",
+        "双子落点中，至少一个点若能结束棋局，另一点主要负责补强或封锁。"
+      ]
+    },
+    {
+      "id": "doc-five-pressure",
+      "title": "五连压力与连续先手",
+      "phase": "middle",
+      "summary": "五连通常迫使对手应对。连续制造五连、活四或双线，可以把普通优势转化为可计算的先手链。",
+      "tags": ["five", "opponent_five", "self_five", "high", "五连威胁", "活四"],
+      "concepts": ["five", "tempo", "forcing_move"],
+      "tips": [
+        "能形成五连时，要同时观察另一个落点是否能扩展第二条线。",
+        "防守五连时，不只堵当前点，还要看对手下一手是否转成双线。"
+      ]
+    },
+    {
+      "id": "doc-double-threat",
+      "title": "双线威胁",
+      "phase": "middle",
+      "summary": "同一手两子若分别在横、竖、斜线制造压力，对手往往无法同时解除全部威胁。",
+      "tags": ["双线", "进攻双线", "防守双线", "活四", "局部连接"],
+      "concepts": ["double_threat", "tempo", "shape"],
+      "tips": [
+        "双线不是简单分散落子，而是让两个点都指向后续可见的成六路线。",
+        "如果一个点进攻、一个点防守，优先确认防守点不会削弱主攻线。"
+      ]
+    },
+    {
+      "id": "doc-center-efficiency",
+      "title": "中腹效率",
+      "phase": "opening",
+      "summary": "开局和中盘早期，中腹落点拥有更多延展方向，通常比边角更容易产生多方向连接。",
+      "tags": ["opening", "中腹效率", "稳健扩张", "center"],
+      "concepts": ["center", "shape"],
+      "tips": [
+        "开局不要只追一条线，优先保留横、竖、两条斜线的扩展余地。",
+        "边线落点要有明确攻防收益，否则容易降低后续双线空间。"
+      ]
+    },
+    {
+      "id": "doc-review-curve",
+      "title": "时间序列复盘",
+      "phase": "late",
+      "summary": "复盘时观察优势曲线的突变点，比只看最后胜负更有教学价值。突变点通常对应漏防、错过成六或双线失败。",
+      "tags": ["late", "review", "timeline", "advantage"],
+      "concepts": ["review_curve", "must_block", "double_threat"],
+      "tips": [
+        "优势曲线突然反向时，回看前一手是否忽略了必须防守点。",
+        "持续小幅领先时，寻找能把优势转为强制先手的落点。"
+      ]
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {"id": "six", "name": "成六", "type": "goal", "summary": "任一方向连续六子即胜。"},
+      {"id": "must_block", "name": "必防点", "type": "risk", "summary": "对手下一手可直接成六的位置。"},
+      {"id": "five", "name": "五连压力", "type": "shape", "summary": "接近成六的高优先级威胁。"},
+      {"id": "double_threat", "name": "双线威胁", "type": "shape", "summary": "一手后产生两条难以同时解除的路线。"},
+      {"id": "forcing_move", "name": "先手", "type": "tempo", "summary": "迫使对手回应的手段。"},
+      {"id": "tempo", "name": "节奏权", "type": "tempo", "summary": "谁能连续提出更强问题。"},
+      {"id": "center", "name": "中腹控制", "type": "space", "summary": "棋盘中央的多方向扩展效率。"},
+      {"id": "shape", "name": "形状效率", "type": "principle", "summary": "棋子连接、开放端和延展方向的综合质量。"},
+      {"id": "review_curve", "name": "复盘曲线", "type": "review", "summary": "随手数变化的局面优势指标。"}
+    ],
+    "edges": [
+      {"source": "must_block", "target": "six", "label": "防止"},
+      {"source": "five", "target": "six", "label": "升级为"},
+      {"source": "double_threat", "target": "forcing_move", "label": "制造"},
+      {"source": "forcing_move", "target": "tempo", "label": "争夺"},
+      {"source": "center", "target": "shape", "label": "提升"},
+      {"source": "shape", "target": "double_threat", "label": "支撑"},
+      {"source": "review_curve", "target": "must_block", "label": "定位漏防"},
+      {"source": "review_curve", "target": "double_threat", "label": "定位转折"}
+    ]
+  }
+}

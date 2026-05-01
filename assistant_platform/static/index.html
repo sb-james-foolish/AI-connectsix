@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>六子棋智能辅助平台</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <h1>六子棋智能辅助平台</h1>
+          <p id="gameStatus">黑棋先手</p>
+        </div>
+        <div class="top-actions">
+          <button id="newGameBtn" type="button">新局</button>
+          <button id="undoBtn" type="button">悔棋</button>
+          <button id="exportBtn" type="button">导出 JSON</button>
+          <button id="importBtn" type="button">导入日志</button>
+          <input id="importFile" type="file" accept="application/json,.json">
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="board-zone">
+          <div class="board-wrap">
+            <div id="board" class="board" aria-label="六子棋棋盘"></div>
+          </div>
+          <div class="movebar">
+            <div>
+              <span class="eyebrow">本手</span>
+              <strong id="selectionText">选择 1 个落点</strong>
+            </div>
+            <button id="submitMoveBtn" class="primary" type="button" disabled>提交落子</button>
+          </div>
+        </section>
+
+        <aside class="side-panel">
+          <nav class="tabs" aria-label="分析视图">
+            <button class="tab active" type="button" data-tab="overview">分析</button>
+            <button class="tab" type="button" data-tab="knowledge">棋理</button>
+            <button class="tab" type="button" data-tab="replay">复盘</button>
+            <button class="tab" type="button" data-tab="json">JSON</button>
+          </nav>
+
+          <section id="overviewPanel" class="tab-panel active">
+            <div class="metrics">
+              <div>
+                <span class="eyebrow">局面</span>
+                <strong id="phaseText">opening</strong>
+              </div>
+              <div>
+                <span class="eyebrow">优势</span>
+                <strong id="advantageText">0.000</strong>
+              </div>
+              <div>
+                <span class="eyebrow">回合</span>
+                <strong id="turnText">黑棋</strong>
+              </div>
+            </div>
+            <div class="advantage-track">
+              <span id="advantageFill"></span>
+            </div>
+
+            <h2>风险提醒</h2>
+            <div id="riskList" class="list"></div>
+
+            <h2>推荐落点</h2>
+            <div id="recommendationBox" class="recommendation"></div>
+
+            <h2>候选点</h2>
+            <div id="candidateList" class="candidate-list"></div>
+
+            <h2>大模型分析</h2>
+            <div id="llmBox" class="llm-box"></div>
+          </section>
+
+          <section id="knowledgePanel" class="tab-panel">
+            <h2>RAG 命中</h2>
+            <div id="ragList" class="list"></div>
+            <h2>知识图谱</h2>
+            <div id="graphBox" class="graph-box"></div>
+          </section>
+
+          <section id="replayPanel" class="tab-panel">
+            <h2>优势曲线</h2>
+            <svg id="replayChart" viewBox="0 0 420 180" role="img" aria-label="复盘优势曲线"></svg>
+            <div id="timelineList" class="timeline"></div>
+          </section>
+
+          <section id="jsonPanel" class="tab-panel">
+            <h2>棋局 JSON</h2>
+            <textarea id="jsonBox" spellcheck="false" readonly></textarea>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
