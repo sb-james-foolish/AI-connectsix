@@ -21,6 +21,7 @@ const els = {
   newGameBtn: document.getElementById("newGameBtn"),
   undoBtn: document.getElementById("undoBtn"),
   exportBtn: document.getElementById("exportBtn"),
+  reportBtn: document.getElementById("reportBtn"),
   importBtn: document.getElementById("importBtn"),
   importFile: document.getElementById("importFile"),
   phaseText: document.getElementById("phaseText"),
@@ -33,8 +34,13 @@ const els = {
   llmBox: document.getElementById("llmBox"),
   ragList: document.getElementById("ragList"),
   graphBox: document.getElementById("graphBox"),
+  profileSummary: document.getElementById("profileSummary"),
+  mistakeList: document.getElementById("mistakeList"),
+  trainingList: document.getElementById("trainingList"),
   replayChart: document.getElementById("replayChart"),
+  turningList: document.getElementById("turningList"),
   timelineList: document.getElementById("timelineList"),
+  reportBox: document.getElementById("reportBox"),
   jsonBox: document.getElementById("jsonBox"),
   toast: document.getElementById("toast"),
 };
@@ -231,7 +237,7 @@ function renderOverview() {
     text.textContent = report.content;
     els.llmBox.appendChild(text);
   } else {
-    for (const key of ["risk", "recommendation", "principle", "review"]) {
+    for (const key of ["risk", "recommendation", "principle", "review", "profile"]) {
       if (!report[key]) continue;
       const p = document.createElement("p");
       p.textContent = report[key];
@@ -293,9 +299,63 @@ function renderKnowledge() {
   els.graphBox.append(nodes, edges);
 }
 
+function percent(value) {
+  return `${(Number(value || 0) * 100).toFixed(1)}%`;
+}
+
+function renderProfile() {
+  const profile = state.analysis?.user_profile || {};
+  els.profileSummary.innerHTML = "";
+  const cards = [
+    ["风格", profile.style || "样本不足"],
+    ["平均质量", String(profile.avg_quality || 0)],
+    ["推荐命中", percent(profile.follow_recommendation_rate)],
+    ["中腹率", percent(profile.center_rate)],
+    ["进攻率", percent(profile.attack_rate)],
+    ["防守率", percent(profile.defense_rate)],
+  ];
+  for (const [label, value] of cards) {
+    const card = document.createElement("div");
+    card.className = "profile-card";
+    card.innerHTML = `<span class="eyebrow">${label}</span><strong>${value}</strong>`;
+    els.profileSummary.appendChild(card);
+  }
+
+  els.mistakeList.innerHTML = "";
+  const evaluations = profile.evaluations || [];
+  const notable = evaluations
+    .filter((item) => item.severity !== "good" || item.tags?.includes("贴近热区"))
+    .slice(-8)
+    .reverse();
+  if (!notable.length) {
+    els.mistakeList.appendChild(listItem("暂无明显失误", "继续观察必防点、成六点和双线机会。"));
+  } else {
+    for (const item of notable) {
+      const detail = `${(item.tags || []).join(" / ")} · 质量 ${item.quality_score}`;
+      const row = listItem(`#${item.ply} ${item.summary}`, detail);
+      row.classList.add(`severity-${item.severity}`);
+      els.mistakeList.appendChild(row);
+    }
+  }
+
+  els.trainingList.innerHTML = "";
+  for (const suggestion of profile.suggestions || []) {
+    els.trainingList.appendChild(listItem(suggestion, ""));
+  }
+}
+
 function renderReplay() {
   const timeline = state.analysis?.timeline || [];
   renderChart(timeline);
+  els.turningList.innerHTML = "";
+  const turning = state.analysis?.turning_points || [];
+  if (!turning.length) {
+    els.turningList.appendChild(listItem("暂无明显转折", "优势曲线比较平稳，可以重点复盘候选点选择。"));
+  } else {
+    for (const item of turning) {
+      els.turningList.appendChild(listItem(item.summary, item.direction));
+    }
+  }
   els.timelineList.innerHTML = "";
   for (const point of timeline.slice().reverse().slice(0, 12)) {
     const item = document.createElement("div");
@@ -349,6 +409,7 @@ function renderJson() {
     board: state.board,
   };
   els.jsonBox.value = JSON.stringify(data, null, 2);
+  els.reportBox.value = state.analysis?.review_report || "";
 }
 
 function render() {
@@ -356,6 +417,7 @@ function render() {
   renderStatus();
   renderOverview();
   renderKnowledge();
+  renderProfile();
   renderReplay();
   renderJson();
 }
@@ -425,6 +487,17 @@ function exportJson() {
   URL.revokeObjectURL(url);
 }
 
+function exportReport() {
+  const payload = state.analysis?.review_report || "# 六子棋复盘报告\n\n暂无复盘内容。";
+  const blob = new Blob([payload], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `connectsix-review-${Date.now()}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 async function importLog(file) {
   try {
     const text = await file.text();
@@ -461,6 +534,7 @@ els.submitMoveBtn.addEventListener("click", submitMove);
 els.newGameBtn.addEventListener("click", newGame);
 els.undoBtn.addEventListener("click", undo);
 els.exportBtn.addEventListener("click", exportJson);
+els.reportBtn.addEventListener("click", exportReport);
 els.importBtn.addEventListener("click", () => els.importFile.click());
 els.importFile.addEventListener("change", () => {
   const file = els.importFile.files?.[0];

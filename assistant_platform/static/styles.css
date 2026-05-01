@@ -243,7 +243,7 @@ button:disabled {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   border-bottom: 1px solid var(--line);
 }
 
@@ -297,6 +297,7 @@ button:disabled {
 .llm-box,
 .timeline-item,
 .graph-box,
+.profile-card,
 textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -334,16 +335,22 @@ textarea {
 
 .list,
 .candidate-list,
-.timeline {
+.timeline,
+.profile-summary {
   display: grid;
   gap: 8px;
+}
+
+.profile-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .list-item,
 .candidate,
 .recommendation,
 .llm-box,
-.timeline-item {
+.timeline-item,
+.profile-card {
   padding: 10px 12px;
 }
 
@@ -462,6 +469,10 @@ textarea {
   white-space: pre;
 }
 
+#reportBox {
+  min-height: 280px;
+}
+
 .toast {
   position: fixed;
   left: 50%;
@@ -526,5 +537,9 @@ textarea {
 
   .tabs {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .profile-summary {
+    grid-template-columns: 1fr;
   }
 }

@@ -17,6 +17,7 @@
           <button id="newGameBtn" type="button">新局</button>
           <button id="undoBtn" type="button">悔棋</button>
           <button id="exportBtn" type="button">导出 JSON</button>
+          <button id="reportBtn" type="button">导出复盘</button>
           <button id="importBtn" type="button">导入日志</button>
           <input id="importFile" type="file" accept="application/json,.json">
         </div>
@@ -40,6 +41,7 @@
           <nav class="tabs" aria-label="分析视图">
             <button class="tab active" type="button" data-tab="overview">分析</button>
             <button class="tab" type="button" data-tab="knowledge">棋理</button>
+            <button class="tab" type="button" data-tab="profile">画像</button>
             <button class="tab" type="button" data-tab="replay">复盘</button>
             <button class="tab" type="button" data-tab="json">JSON</button>
           </nav>
@@ -83,10 +85,23 @@
             <div id="graphBox" class="graph-box"></div>
           </section>
 
+          <section id="profilePanel" class="tab-panel">
+            <h2>用户画像</h2>
+            <div id="profileSummary" class="profile-summary"></div>
+            <h2>本局失误与亮点</h2>
+            <div id="mistakeList" class="list"></div>
+            <h2>训练建议</h2>
+            <div id="trainingList" class="list"></div>
+          </section>
+
           <section id="replayPanel" class="tab-panel">
             <h2>优势曲线</h2>
             <svg id="replayChart" viewBox="0 0 420 180" role="img" aria-label="复盘优势曲线"></svg>
+            <h2>关键转折</h2>
+            <div id="turningList" class="list"></div>
             <div id="timelineList" class="timeline"></div>
+            <h2>复盘报告</h2>
+            <textarea id="reportBox" spellcheck="false" readonly></textarea>
           </section>
 
           <section id="jsonPanel" class="tab-panel">
