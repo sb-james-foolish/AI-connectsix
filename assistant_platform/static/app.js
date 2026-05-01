@@ -133,6 +133,10 @@ function selectedSet() {
   return new Set(state.selected.map((point) => pointKey(point.x, point.y)));
 }
 
+function isStarPoint(x, y) {
+  return [3, 7, 11].includes(x) && [3, 7, 11].includes(y);
+}
+
 function renderBoard() {
   const heat = heatMap();
   const recommended = recommendationSet();
@@ -144,11 +148,15 @@ function renderBoard() {
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "cell";
-      cell.title = `(${x}, ${y})`;
+      cell.setAttribute("aria-label", `坐标 ${x}, ${y}`);
+      if (isStarPoint(x, y)) cell.classList.add("star");
       const key = pointKey(x, y);
       const heatCell = heat.get(key);
       if (heatCell && state.board[y][x] === EMPTY) {
-        cell.style.setProperty("--heat", String(Math.max(0.04, heatCell.heat * 0.86)));
+        const visibleHeat = heatCell.level === "critical"
+          ? Math.max(0.34, heatCell.heat * 0.58)
+          : Math.max(0, (heatCell.heat - 0.44) * 0.7);
+        cell.style.setProperty("--heat", String(Math.min(0.52, visibleHeat)));
       }
       if (recommended.has(key) && state.board[y][x] === EMPTY) cell.classList.add("recommended");
       if (selected.has(key)) cell.classList.add("selected");
