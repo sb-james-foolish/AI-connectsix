@@ -3,37 +3,45 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>六子棋智能辅助平台</title>
+    <title>六子棋全息AI对战辅助平台</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <div class="app">
+    <canvas id="spaceCanvas" class="space-canvas" aria-hidden="true"></canvas>
+    <div class="scanlines" aria-hidden="true"></div>
+
+    <div class="app-shell">
       <header class="topbar">
-        <div>
-          <h1>六子棋智能辅助平台</h1>
-          <p id="gameStatus">黑棋先手</p>
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <h1>六子棋全息AI对战辅助平台</h1>
+            <p id="gameStatus">黑棋先手 · HUD LINK ONLINE</p>
+          </div>
         </div>
         <div class="top-actions">
           <button id="newGameBtn" type="button">新局</button>
           <button id="undoBtn" type="button">悔棋</button>
-          <button id="exportBtn" type="button">导出 JSON</button>
           <button id="reportBtn" type="button">导出复盘</button>
+          <button id="exportBtn" type="button">导出JSON</button>
           <button id="importBtn" type="button">导入日志</button>
           <input id="importFile" type="file" accept="application/json,.json">
         </div>
       </header>
 
-      <main class="layout">
+      <main class="hud-layout">
         <section class="board-zone">
-          <div class="board-wrap">
+          <div class="board-stage hud-card">
             <div class="board-tools">
               <button id="heatmapToggle" class="mode-toggle" type="button" aria-pressed="false">AI热力图分析</button>
+              <span class="scan-state">SCAN <b></b></span>
             </div>
+            <div class="holo-ring" aria-hidden="true"></div>
             <div id="board" class="board" aria-label="六子棋棋盘"></div>
           </div>
-          <div class="movebar">
+          <div class="movebar hud-card">
             <div>
-              <span class="eyebrow">本手</span>
+              <span class="eyebrow">当前落子指令</span>
               <strong id="selectionText">选择 1 个落点</strong>
             </div>
             <button id="submitMoveBtn" class="primary" type="button" disabled>提交落子</button>
@@ -41,74 +49,107 @@
         </section>
 
         <aside class="side-panel">
-          <nav class="tabs" aria-label="分析视图">
-            <button class="tab active" type="button" data-tab="overview">分析</button>
-            <button class="tab" type="button" data-tab="knowledge">棋理</button>
-            <button class="tab" type="button" data-tab="profile">画像</button>
-            <button class="tab" type="button" data-tab="replay">复盘</button>
-            <button class="tab" type="button" data-tab="json">JSON</button>
-          </nav>
-
-          <section id="overviewPanel" class="tab-panel active">
+          <section class="hud-module metrics-module" data-panel="overview">
+            <div class="module-title">
+              <span>实时对战指标</span>
+              <em>LIVE TELEMETRY</em>
+            </div>
             <div class="metrics">
               <div>
-                <span class="eyebrow">局面</span>
+                <span class="eyebrow">局面阶段</span>
                 <strong id="phaseText">opening</strong>
               </div>
               <div>
-                <span class="eyebrow">优势</span>
+                <span class="eyebrow">优势值</span>
                 <strong id="advantageText">0.000</strong>
               </div>
               <div>
-                <span class="eyebrow">回合</span>
+                <span class="eyebrow">当前回合</span>
                 <strong id="turnText">黑棋</strong>
+              </div>
+            </div>
+            <div class="gauge-grid">
+              <div id="winGauge" class="gauge" style="--value: 50">
+                <span id="winRateText">50%</span>
+                <small>胜率</small>
+              </div>
+              <div id="controlGauge" class="gauge" style="--value: 50">
+                <span id="controlRateText">50%</span>
+                <small>控场率</small>
+              </div>
+              <div id="warningGauge" class="gauge danger" style="--value: 0">
+                <span id="warningLevelText">低</span>
+                <small>预警</small>
               </div>
             </div>
             <div class="advantage-track">
               <span id="advantageFill"></span>
             </div>
+          </section>
 
-            <h2>风险提醒</h2>
-            <div id="riskList" class="list"></div>
+          <section class="hud-module" data-panel="replay">
+            <div class="module-title">
+              <span>优势曲线实时分析</span>
+              <em>ADVANTAGE CURVE</em>
+            </div>
+            <svg id="replayChart" viewBox="0 0 420 180" role="img" aria-label="复盘优势曲线"></svg>
+          </section>
 
-            <h2>推荐落点</h2>
-            <div id="recommendationBox" class="recommendation"></div>
+          <section class="hud-module">
+            <div class="module-title">
+              <span>关键回合拆解</span>
+              <em>TURNING POINTS</em>
+            </div>
+            <div id="turningList" class="list compact-list"></div>
+            <div id="timelineList" class="timeline compact-list"></div>
+          </section>
 
-            <h2>候选点</h2>
+          <section class="hud-module recommendation-module">
+            <div class="module-title">
+              <span>复盘报告与落子推荐</span>
+              <em>AI ANALYSIS</em>
+            </div>
+            <div class="dual-grid">
+              <div>
+                <h2>局势与威胁</h2>
+                <div id="riskList" class="list"></div>
+              </div>
+              <div>
+                <h2>推荐落点</h2>
+                <div id="recommendationBox" class="recommendation"></div>
+              </div>
+            </div>
+            <h2>候选点位</h2>
             <div id="candidateList" class="candidate-list"></div>
-
             <h2>大模型分析</h2>
             <div id="llmBox" class="llm-box"></div>
           </section>
 
-          <section id="knowledgePanel" class="tab-panel">
-            <h2>RAG 命中</h2>
-            <div id="ragList" class="list"></div>
-            <h2>知识图谱</h2>
-            <div id="graphBox" class="graph-box"></div>
-          </section>
-
-          <section id="profilePanel" class="tab-panel">
-            <h2>用户画像</h2>
+          <section class="hud-module compact-support" data-panel="profile">
+            <div class="module-title">
+              <span>用户画像与训练建议</span>
+              <em>PLAYER PROFILE</em>
+            </div>
             <div id="profileSummary" class="profile-summary"></div>
-            <h2>本局失误与亮点</h2>
             <div id="mistakeList" class="list"></div>
-            <h2>训练建议</h2>
             <div id="trainingList" class="list"></div>
           </section>
 
-          <section id="replayPanel" class="tab-panel">
-            <h2>优势曲线</h2>
-            <svg id="replayChart" viewBox="0 0 420 180" role="img" aria-label="复盘优势曲线"></svg>
-            <h2>关键转折</h2>
-            <div id="turningList" class="list"></div>
-            <div id="timelineList" class="timeline"></div>
-            <h2>复盘报告</h2>
-            <textarea id="reportBox" spellcheck="false" readonly></textarea>
+          <section class="hud-module compact-support" data-panel="knowledge">
+            <div class="module-title">
+              <span>RAG棋理与知识图谱</span>
+              <em>TACTICAL GRAPH</em>
+            </div>
+            <div id="ragList" class="list"></div>
+            <div id="graphBox" class="graph-box"></div>
           </section>
 
-          <section id="jsonPanel" class="tab-panel">
-            <h2>棋局 JSON</h2>
+          <section class="hud-module compact-support" data-panel="json">
+            <div class="module-title">
+              <span>复盘与棋局数据</span>
+              <em>EXPORT STREAM</em>
+            </div>
+            <textarea id="reportBox" spellcheck="false" readonly></textarea>
             <textarea id="jsonBox" spellcheck="false" readonly></textarea>
           </section>
         </aside>

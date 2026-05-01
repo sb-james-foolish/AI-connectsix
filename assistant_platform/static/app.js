@@ -29,6 +29,12 @@ const els = {
   phaseText: document.getElementById("phaseText"),
   advantageText: document.getElementById("advantageText"),
   advantageFill: document.getElementById("advantageFill"),
+  winGauge: document.getElementById("winGauge"),
+  controlGauge: document.getElementById("controlGauge"),
+  warningGauge: document.getElementById("warningGauge"),
+  winRateText: document.getElementById("winRateText"),
+  controlRateText: document.getElementById("controlRateText"),
+  warningLevelText: document.getElementById("warningLevelText"),
   turnText: document.getElementById("turnText"),
   riskList: document.getElementById("riskList"),
   recommendationBox: document.getElementById("recommendationBox"),
@@ -121,11 +127,15 @@ function hideResultOverlay() {
 
 function switchTab(tabName) {
   const target = document.querySelector(`.tab[data-tab="${tabName}"]`);
-  if (!target) return;
-  for (const item of document.querySelectorAll(".tab")) item.classList.remove("active");
-  for (const panel of document.querySelectorAll(".tab-panel")) panel.classList.remove("active");
-  target.classList.add("active");
-  document.getElementById(`${tabName}Panel`).classList.add("active");
+  if (target) {
+    for (const item of document.querySelectorAll(".tab")) item.classList.remove("active");
+    for (const panel of document.querySelectorAll(".tab-panel")) panel.classList.remove("active");
+    target.classList.add("active");
+    document.getElementById(`${tabName}Panel`)?.classList.add("active");
+    return;
+  }
+  const panel = document.querySelector(`[data-panel="${tabName}"]`);
+  if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function showResultOverlay(winner, humanPlayer) {
@@ -218,6 +228,32 @@ function renderBoard() {
 function renderModeToggle() {
   els.heatmapToggle.classList.toggle("active", state.showHeatmap);
   els.heatmapToggle.setAttribute("aria-pressed", state.showHeatmap ? "true" : "false");
+}
+
+function setGauge(gauge, text, value, label) {
+  if (!gauge || !text) return;
+  const clamped = Math.max(0, Math.min(100, value));
+  gauge.style.setProperty("--value", clamped.toFixed(1));
+  text.textContent = label ?? `${Math.round(clamped)}%`;
+}
+
+function renderHudMetrics() {
+  const analysis = state.analysis;
+  if (!analysis) return;
+  const advantage = Number(analysis.snapshot?.advantage || 0);
+  const blackWinRate = 50 + advantage * 42;
+  const profile = analysis.user_profile || {};
+  const centerRate = Number(profile.center_rate || 0);
+  const followRate = Number(profile.follow_recommendation_rate || 0);
+  const controlRate = Math.max(24, Math.min(96, 42 + centerRate * 28 + followRate * 26 + Math.abs(advantage) * 16));
+  const threats = analysis.threats || [];
+  const hasCritical = threats.some((item) => item.severity === "critical");
+  const hasHigh = threats.some((item) => item.severity === "high" || item.severity === "medium");
+  const warningValue = hasCritical ? 92 : hasHigh ? 62 : threats.length ? 34 : 16;
+  const warningLabel = hasCritical ? "高" : hasHigh ? "中" : "低";
+  setGauge(els.winGauge, els.winRateText, blackWinRate);
+  setGauge(els.controlGauge, els.controlRateText, controlRate);
+  setGauge(els.warningGauge, els.warningLevelText, warningValue, warningLabel);
 }
 
 function selectCell(x, y) {
@@ -428,9 +464,39 @@ function renderChart(timeline) {
   const width = 420;
   const height = 180;
   const pad = 24;
+  const defs = document.createElementNS(ns, "defs");
+  defs.innerHTML = `
+    <linearGradient id="curveGradient" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#9d5cff"/>
+      <stop offset="100%" stop-color="#22f7ff"/>
+    </linearGradient>
+    <filter id="curveGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>`;
+  svg.appendChild(defs);
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad + (i / 4) * (height - pad * 2);
+    const grid = document.createElementNS(ns, "path");
+    grid.setAttribute("d", `M${pad} ${y}H${width - pad}`);
+    grid.setAttribute("stroke", i === 2 ? "rgba(34,247,255,0.35)" : "rgba(34,247,255,0.12)");
+    grid.setAttribute("stroke-width", i === 2 ? "1.4" : "1");
+    svg.appendChild(grid);
+  }
+  for (let i = 0; i <= 5; i += 1) {
+    const x = pad + (i / 5) * (width - pad * 2);
+    const grid = document.createElementNS(ns, "path");
+    grid.setAttribute("d", `M${x} ${pad}V${height - pad}`);
+    grid.setAttribute("stroke", "rgba(157,92,255,0.1)");
+    grid.setAttribute("stroke-width", "1");
+    svg.appendChild(grid);
+  }
   const axis = document.createElementNS(ns, "path");
   axis.setAttribute("d", `M${pad} ${height / 2}H${width - pad}`);
-  axis.setAttribute("stroke", "#cbd5e1");
+  axis.setAttribute("stroke", "rgba(34,247,255,0.4)");
   axis.setAttribute("stroke-width", "2");
   svg.appendChild(axis);
   if (!timeline.length) return;
@@ -442,17 +508,22 @@ function renderChart(timeline) {
   const line = document.createElementNS(ns, "polyline");
   line.setAttribute("points", points.map((p) => p.join(",")).join(" "));
   line.setAttribute("fill", "none");
-  line.setAttribute("stroke", "#0f766e");
+  line.setAttribute("stroke", "url(#curveGradient)");
   line.setAttribute("stroke-width", "3");
   line.setAttribute("stroke-linecap", "round");
   line.setAttribute("stroke-linejoin", "round");
+  line.setAttribute("filter", "url(#curveGlow)");
   svg.appendChild(line);
-  for (const [x, y] of points) {
+  for (const [index, [x, y]] of points.entries()) {
     const circle = document.createElementNS(ns, "circle");
     circle.setAttribute("cx", String(x));
     circle.setAttribute("cy", String(y));
-    circle.setAttribute("r", "4");
-    circle.setAttribute("fill", "#334155");
+    circle.setAttribute("r", "4.2");
+    circle.setAttribute("fill", index % 2 ? "#9d5cff" : "#22f7ff");
+    circle.setAttribute("filter", "url(#curveGlow)");
+    const title = document.createElementNS(ns, "title");
+    title.textContent = `第${timeline[index].ply}手 优势 ${timeline[index].advantage}`;
+    circle.appendChild(title);
     svg.appendChild(circle);
   }
 }
@@ -472,6 +543,7 @@ function render() {
   renderModeToggle();
   renderBoard();
   renderStatus();
+  renderHudMetrics();
   renderOverview();
   renderKnowledge();
   renderProfile();
@@ -586,6 +658,96 @@ function bindTabs() {
   }
 }
 
+function initSpaceCanvas() {
+  const canvas = document.getElementById("spaceCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const binary = "010101 AI CONNECT6 HUD ";
+  let width = 0;
+  let height = 0;
+  let particles = [];
+  let streams = [];
+
+  function resize() {
+    width = canvas.width = Math.floor(window.innerWidth * window.devicePixelRatio);
+    height = canvas.height = Math.floor(window.innerHeight * window.devicePixelRatio);
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${window.innerHeight}px`;
+    particles = Array.from({ length: 76 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.32 * window.devicePixelRatio,
+      vy: (Math.random() - 0.5) * 0.32 * window.devicePixelRatio,
+      r: (Math.random() * 1.8 + 0.7) * window.devicePixelRatio,
+      hue: Math.random() > 0.45 ? "34,247,255" : "157,92,255",
+    }));
+    const cols = Math.max(18, Math.floor(window.innerWidth / 48));
+    streams = Array.from({ length: cols }, (_, i) => ({
+      x: (i / cols) * width + Math.random() * 24 * window.devicePixelRatio,
+      y: Math.random() * height,
+      speed: (0.45 + Math.random() * 0.75) * window.devicePixelRatio,
+      alpha: 0.08 + Math.random() * 0.16,
+    }));
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "rgba(2, 6, 23, 0.22)";
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.font = `${12 * window.devicePixelRatio}px Consolas, monospace`;
+    for (const stream of streams) {
+      stream.y += stream.speed;
+      if (stream.y > height + 140) stream.y = -80;
+      const chars = binary.slice(0, 18);
+      for (let i = 0; i < chars.length; i += 1) {
+        ctx.fillStyle = `rgba(34,247,255,${stream.alpha * (1 - i / chars.length)})`;
+        ctx.fillText(chars[i], stream.x, stream.y - i * 14 * window.devicePixelRatio);
+      }
+    }
+
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < -20) p.x = width + 20;
+      if (p.x > width + 20) p.x = -20;
+      if (p.y < -20) p.y = height + 20;
+      if (p.y > height + 20) p.y = -20;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${p.hue},0.62)`;
+      ctx.shadowColor = `rgba(${p.hue},0.8)`;
+      ctx.shadowBlur = 10 * window.devicePixelRatio;
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    for (let i = 0; i < particles.length; i += 1) {
+      for (let j = i + 1; j < particles.length; j += 1) {
+        const a = particles[i];
+        const b = particles[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 120 * window.devicePixelRatio) {
+          ctx.strokeStyle = `rgba(34,247,255,${0.075 * (1 - dist / (120 * window.devicePixelRatio))})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  draw();
+}
+
 els.submitMoveBtn.addEventListener("click", submitMove);
 els.heatmapToggle.addEventListener("click", () => {
   state.showHeatmap = !state.showHeatmap;
@@ -607,4 +769,5 @@ els.importFile.addEventListener("change", () => {
 });
 
 bindTabs();
+initSpaceCanvas();
 newGame().catch((error) => showToast(error.message));
