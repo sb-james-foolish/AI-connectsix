@@ -15,6 +15,7 @@ const state = {
 };
 
 const API_BASE = String(window.CONNECTSIX_API_BASE || "").replace(/\/$/, "");
+let analysisRequestSeq = 0;
 
 const boardCells = [];
 
@@ -104,12 +105,13 @@ function rebuildBoard() {
   state.board = board;
 }
 
-async function api(path, payload) {
+async function api(path, payload, options = {}) {
   const url = /^https?:\/\//i.test(path) ? path : `${API_BASE}${path}`;
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal: options.signal,
   });
   const data = await response.json();
   if (!response.ok) {
@@ -592,29 +594,36 @@ function render() {
   });
 }
 
-async function refreshAnalysis(includeLlm = false) {
-  state.analysis = await api("/api/analyze", {
-    moves: state.moves,
-    current_player: state.currentPlayer || BLACK,
-    include_llm: includeLlm,
-  });
-  render();
+async function refreshAnalysis(includeLlm = false, { background = false } = {}) {
+  const requestSeq = ++analysisRequestSeq;
+  try {
+    const analysis = await api("/api/analyze", {
+      moves: state.moves,
+      current_player: state.currentPlayer || BLACK,
+      include_llm: includeLlm,
+    });
+    if (requestSeq !== analysisRequestSeq) return;
+    state.analysis = analysis;
+    render();
+  } catch (error) {
+    if (!background) throw error;
+  }
 }
 
 async function submitMove() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     els.submitMoveBtn.disabled = true;
     els.submitMoveBtn.textContent = "计算中...";
     const humanPlayer = state.currentPlayer;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const data = await api("/api/play", {
       moves: state.moves,
       player: humanPlayer,
       stones: state.selected,
       include_llm: false,
-    });
-    clearTimeout(timeoutId);
+    }, { signal: controller.signal });
+    analysisRequestSeq += 1;
     state.moves = data.moves;
     state.board = data.board;
     state.currentPlayer = data.current_player || state.currentPlayer;
@@ -623,16 +632,19 @@ async function submitMove() {
     state.lastBotMove = data.last_bot_move;
     state.selected = [];
     render();
+    void refreshAnalysis(false, { background: true });
     if (state.winner) showResultOverlay(state.winner, humanPlayer);
   } catch (error) {
-    showToast(error.message);
+    showToast(error.name === "AbortError" ? "计算超时，请稍后重试" : error.message);
   } finally {
+    clearTimeout(timeoutId);
     els.submitMoveBtn.disabled = Boolean(state.winner) || state.selected.length !== expectedStones();
     els.submitMoveBtn.textContent = "提交落子";
   }
 }
 
 async function newGame() {
+  analysisRequestSeq += 1;
   state.moves = [];
   state.board = makeBoard();
   state.currentPlayer = BLACK;
@@ -645,6 +657,7 @@ async function newGame() {
 
 async function undo() {
   if (!state.moves.length) return;
+  analysisRequestSeq += 1;
   const last = state.moves[state.moves.length - 1];
   const removeCount = last.source === "robot" && state.moves.length >= 2 ? 2 : 1;
   state.moves.splice(state.moves.length - removeCount, removeCount);
@@ -684,6 +697,7 @@ async function importLog(file) {
     const text = await file.text();
     const json = JSON.parse(text);
     const data = await api("/api/import-botzone", Array.isArray(json) ? json : { entries: json.entries || json.log || json });
+    analysisRequestSeq += 1;
     state.moves = data.moves;
     state.board = data.board;
     state.currentPlayer = data.current_player || BLACK;

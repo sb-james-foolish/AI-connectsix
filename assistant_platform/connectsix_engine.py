@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import json
 import math
 import os
@@ -19,6 +18,9 @@ BLACK = 1
 WHITE = -1
 PLAYERS = {BLACK, WHITE}
 DIRECTIONS = ((1, 0), (0, 1), (1, 1), (1, -1))
+FAST_ANALYSIS = "fast"
+FULL_ANALYSIS = "full"
+_KNOWLEDGE_CACHE: dict[str, Any] | None = None
 PLAYER_NAMES = {BLACK: "黑棋", WHITE: "白棋"}
 
 
@@ -173,6 +175,41 @@ def build_board(moves: list[Move], validate: bool = False) -> list[list[int]]:
     return board
 
 
+def clear_stones(board: list[list[int]], stones: list[Point]) -> None:
+    for stone in stones:
+        board[stone.y][stone.x] = EMPTY
+
+
+def candidate_points(board: list[list[int]], radius: int = 2) -> list[tuple[int, int]]:
+    size = len(board)
+    center = size // 2
+    occupied: list[tuple[int, int]] = []
+    for y, row in enumerate(board):
+        for x, value in enumerate(row):
+            if value != EMPTY:
+                occupied.append((x, y))
+
+    if not occupied:
+        return [(x, y) for y in range(size) for x in range(size)]
+
+    frontier: set[tuple[int, int]] = set()
+    for ox, oy in occupied:
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                x = ox + dx
+                y = oy + dy
+                if in_board(x, y, size) and board[y][x] == EMPTY:
+                    frontier.add((x, y))
+
+    if not frontier:
+        return [(x, y) for y in range(size) for x in range(size) if board[y][x] == EMPTY]
+
+    if board[center][center] == EMPTY:
+        frontier.add((center, center))
+
+    return sorted(frontier, key=lambda item: (abs(item[0] - center) + abs(item[1] - center), item[1], item[0]))
+
+
 def count_direction(board: list[list[int]], x: int, y: int, player: int, dx: int, dy: int) -> int:
     size = len(board)
     count = 0
@@ -285,13 +322,16 @@ def point_score(board: list[list[int]], x: int, y: int, player: int) -> dict[str
     }
 
 
-def heatmap_for(board: list[list[int]], player: int) -> list[dict[str, Any]]:
+def heatmap_for(
+    board: list[list[int]],
+    player: int,
+    candidates: list[tuple[int, int]] | None = None,
+) -> list[dict[str, Any]]:
     cells: list[dict[str, Any]] = []
-    for y in range(len(board)):
-        for x in range(len(board)):
-            scored = point_score(board, x, y, player)
-            if scored:
-                cells.append(scored)
+    for x, y in candidates or candidate_points(board):
+        scored = point_score(board, x, y, player)
+        if scored:
+            cells.append(scored)
     if not cells:
         return []
 
@@ -313,9 +353,11 @@ def heatmap_for(board: list[list[int]], player: int) -> list[dict[str, Any]]:
 
 
 def makes_win_after(board: list[list[int]], player: int, stones: list[Point]) -> bool:
-    trial = copy.deepcopy(board)
-    apply_stones(trial, player, stones)
-    return any(is_win_from(trial, stone.x, stone.y, player) for stone in stones)
+    apply_stones(board, player, stones)
+    try:
+        return any(is_win_from(board, stone.x, stone.y, player) for stone in stones)
+    finally:
+        clear_stones(board, stones)
 
 
 def is_win_from(board: list[list[int]], x: int, y: int, player: int) -> bool:
@@ -338,9 +380,13 @@ def winner(board: list[list[int]], last_move: Move | None = None) -> int:
     return EMPTY
 
 
-def recommend_move(board: list[list[int]], player: int) -> dict[str, Any]:
+def recommend_move(
+    board: list[list[int]],
+    player: int,
+    scored: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     count = expected_stone_count(board, player)
-    scored = sorted(heatmap_for(board, player), key=lambda item: item["score"], reverse=True)
+    scored = sorted(scored or heatmap_for(board, player), key=lambda item: item["score"], reverse=True)
     if not scored:
         return {"stones": [], "score": 0, "reason": "棋盘已满", "candidates": []}
     if count == 1:
@@ -352,27 +398,30 @@ def recommend_move(board: list[list[int]], player: int) -> dict[str, Any]:
             "candidates": scored[:10],
         }
 
-    first_pool = scored[: min(12, len(scored))]
+    first_pool = scored[: min(8, len(scored))]
     best_pair: tuple[int, list[dict[str, Any]]] | None = None
     for first in first_pool:
-        trial = copy.deepcopy(board)
         p1 = Point(first["x"], first["y"])
-        apply_stones(trial, player, [p1])
-        second_pool = [
-            item for item in sorted(heatmap_for(trial, player), key=lambda item: item["score"], reverse=True)
-            if not (item["x"] == p1.x and item["y"] == p1.y)
-        ][:8]
-        for second in second_pool:
-            p2 = Point(second["x"], second["y"])
-            pair_score = int(first["score"] + second["score"] * 0.96)
-            if p1.x == p2.x or p1.y == p2.y or abs(p1.x - p2.x) == abs(p1.y - p2.y):
-                pair_score += 850
-            if abs(p1.x - p2.x) + abs(p1.y - p2.y) <= 4:
-                pair_score += 320
-            if makes_win_after(board, player, [p1, p2]):
-                pair_score += 100_000
-            if best_pair is None or pair_score > best_pair[0]:
-                best_pair = (pair_score, [first, second])
+        apply_stones(board, player, [p1])
+        try:
+            second_pool = sorted(heatmap_for(board, player), key=lambda item: item["score"], reverse=True)[:6]
+            for second in second_pool:
+                p2 = Point(second["x"], second["y"])
+                apply_stones(board, player, [p2])
+                try:
+                    pair_score = int(first["score"] + second["score"] * 0.96)
+                    if p1.x == p2.x or p1.y == p2.y or abs(p1.x - p2.x) == abs(p1.y - p2.y):
+                        pair_score += 850
+                    if abs(p1.x - p2.x) + abs(p1.y - p2.y) <= 4:
+                        pair_score += 320
+                    if is_win_from(board, p1.x, p1.y, player) or is_win_from(board, p2.x, p2.y, player):
+                        pair_score += 100_000
+                    if best_pair is None or pair_score > best_pair[0]:
+                        best_pair = (pair_score, [first, second])
+                finally:
+                    clear_stones(board, [p2])
+        finally:
+            clear_stones(board, [p1])
 
     assert best_pair is not None
     pair_score, pair = best_pair
@@ -394,10 +443,15 @@ def explain_recommendation(points: list[dict[str, Any]], player: int) -> str:
     return f"建议 {PLAYER_NAMES[player]} 落在 {names}：{label_text}。"
 
 
-def detect_threats(board: list[list[int]], player: int) -> list[dict[str, Any]]:
+def detect_threats(
+    board: list[list[int]],
+    player: int,
+    scored_self: list[dict[str, Any]] | None = None,
+    scored_opp: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     threats: list[dict[str, Any]] = []
-    scored_self = heatmap_for(board, player)
-    scored_opp = heatmap_for(board, -player)
+    scored_self = scored_self or heatmap_for(board, player)
+    scored_opp = scored_opp or heatmap_for(board, -player)
 
     for cell in sorted(scored_opp, key=lambda item: item["defense"] + item["attack"], reverse=True)[:18]:
         if cell["max_attack_line"] >= 6:
@@ -452,9 +506,13 @@ def phase_for_moves(moves: list[Move]) -> str:
     return "late"
 
 
-def score_snapshot(board: list[list[int]]) -> dict[str, Any]:
-    black_heat = heatmap_for(board, BLACK)
-    white_heat = heatmap_for(board, WHITE)
+def score_snapshot(
+    board: list[list[int]],
+    black_heat: list[dict[str, Any]] | None = None,
+    white_heat: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    black_heat = black_heat or heatmap_for(board, BLACK)
+    white_heat = white_heat or heatmap_for(board, WHITE)
     black_best = max((cell["score"] for cell in black_heat), default=0)
     white_best = max((cell["score"] for cell in white_heat), default=0)
     black_center = 0
@@ -535,9 +593,11 @@ def evaluate_move_quality(board_before: list[list[int]], move: Move, ply: int) -
         if threat["type"] == "opponent_five" and _point_key(threat["point"]) not in selected
     ]
 
-    board_after = copy.deepcopy(board_before)
-    apply_stones(board_after, move.player, move.stones)
-    opponent_after = detect_threats(board_after, -move.player)
+    apply_stones(board_before, move.player, move.stones)
+    try:
+        opponent_after = detect_threats(board_before, -move.player)
+    finally:
+        clear_stones(board_before, move.stones)
     created_direct_risks = [threat for threat in opponent_after if threat["type"] == "self_win"]
 
     best_overlap = len(selected & rec_points)
@@ -812,10 +872,16 @@ def timeline_for_moves(moves: list[Move]) -> list[dict[str, Any]]:
 
 
 def load_knowledge(base_dir: Path | None = None) -> dict[str, Any]:
+    global _KNOWLEDGE_CACHE
+    if base_dir is None and _KNOWLEDGE_CACHE is not None:
+        return _KNOWLEDGE_CACHE
     root = base_dir or Path(__file__).resolve().parent
     path = root / "knowledge" / "connectsix_knowledge.json"
     with path.open("r", encoding="utf-8") as handle:
-        return json.load(handle)
+        knowledge = json.load(handle)
+    if base_dir is None:
+        _KNOWLEDGE_CACHE = knowledge
+    return knowledge
 
 
 def _query_terms(analysis_seed: dict[str, Any]) -> set[str]:
@@ -993,7 +1059,12 @@ def maybe_call_llm(seed: dict[str, Any], docs: list[dict[str, Any]]) -> dict[str
         return fallback
 
 
-def analyze_game(moves: list[Move], current_player: int | None = None, include_llm: bool = True) -> dict[str, Any]:
+def analyze_game(
+    moves: list[Move],
+    current_player: int | None = None,
+    include_llm: bool = True,
+    detail: str = FULL_ANALYSIS,
+) -> dict[str, Any]:
     board = build_board(moves)
     if current_player is None:
         current_player = BLACK if not moves else -moves[-1].player
@@ -1003,9 +1074,33 @@ def analyze_game(moves: list[Move], current_player: int | None = None, include_l
     phase = phase_for_moves(moves)
     heat = heatmap_for(board, current_player)
     heat_sorted = sorted(heat, key=lambda item: item["score"], reverse=True)
-    recommendation = recommend_move(board, current_player)
-    threats = detect_threats(board, current_player)
-    snapshot = score_snapshot(board)
+    other_heat = heatmap_for(board, -current_player)
+    recommendation = recommend_move(board, current_player, scored=heat_sorted)
+    threats = detect_threats(board, current_player, scored_self=heat_sorted, scored_opp=other_heat)
+    black_heat = heat_sorted if current_player == BLACK else other_heat
+    white_heat = other_heat if current_player == BLACK else heat_sorted
+    snapshot = score_snapshot(board, black_heat=black_heat, white_heat=white_heat)
+    last_winner = winner(board, moves[-1] if moves else None)
+
+    result = {
+        "board_size": len(board),
+        "current_player": current_player,
+        "current_player_name": PLAYER_NAMES[current_player],
+        "expected_stones": expected_stone_count(board, current_player),
+        "phase": phase,
+        "winner": last_winner,
+        "winner_name": PLAYER_NAMES.get(last_winner, ""),
+        "snapshot": snapshot,
+        "threats": threats,
+        "recommendation": recommendation,
+        "top_candidates": heat_sorted[:12],
+        "heatmap": heat,
+        "game_json": serialize_game_json(moves, board, current_player),
+    }
+
+    if detail == FAST_ANALYSIS:
+        return result
+
     timeline = timeline_for_moves(moves)
     profile = user_profile_for_moves(moves)
     turning_points = turning_points_from_timeline(timeline)
@@ -1023,7 +1118,6 @@ def analyze_game(moves: list[Move], current_player: int | None = None, include_l
     docs = retrieve_knowledge(knowledge, terms)
     graph = knowledge_subgraph(knowledge, docs, threats)
     report = maybe_call_llm(seed, docs) if include_llm else template_llm_report(seed, docs)
-    last_winner = winner(board, moves[-1] if moves else None)
     review_report = build_review_report(
         moves=moves,
         snapshot=snapshot,
@@ -1034,20 +1128,7 @@ def analyze_game(moves: list[Move], current_player: int | None = None, include_l
         docs=docs,
         last_winner=last_winner,
     )
-
-    return {
-        "board_size": len(board),
-        "current_player": current_player,
-        "current_player_name": PLAYER_NAMES[current_player],
-        "expected_stones": expected_stone_count(board, current_player),
-        "phase": phase,
-        "winner": last_winner,
-        "winner_name": PLAYER_NAMES.get(last_winner, ""),
-        "snapshot": snapshot,
-        "threats": threats,
-        "recommendation": recommendation,
-        "top_candidates": heat_sorted[:12],
-        "heatmap": heat,
+    result.update({
         "rag": docs,
         "knowledge_graph": graph,
         "timeline": timeline,
@@ -1055,8 +1136,8 @@ def analyze_game(moves: list[Move], current_player: int | None = None, include_l
         "user_profile": profile,
         "llm_report": report,
         "review_report": review_report,
-        "game_json": serialize_game_json(moves, board, current_player),
-    }
+    })
+    return result
 
 
 def parse_botzone_log(entries: list[Any]) -> list[Move]:

@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlparse
 from connectsix_engine import (
     BLACK,
     EMPTY,
+    FAST_ANALYSIS,
     GameError,
     Move,
     Point,
@@ -22,7 +23,6 @@ from connectsix_engine import (
     coerce_moves,
     coerce_point,
     empty_board,
-    expected_stone_count,
     load_knowledge,
     move_to_dict,
     parse_botzone_log,
@@ -149,7 +149,6 @@ class AssistantHandler(BaseHTTPRequestHandler):
         apply_stones(board, player, stones)
         next_moves = moves + [human_move]
         win = winner(board, human_move)
-        human_analysis = analyze_game(next_moves, current_player=-player, include_llm=False)
         include_llm = bool(payload.get("include_llm", False))
 
         if win != EMPTY:
@@ -159,8 +158,12 @@ class AssistantHandler(BaseHTTPRequestHandler):
                 "winner": win,
                 "current_player": EMPTY,
                 "last_bot_move": None,
-                "human_analysis": human_analysis,
-                "analysis": analyze_game(next_moves, current_player=-player, include_llm=include_llm),
+                "analysis": analyze_game(
+                    next_moves,
+                    current_player=-player,
+                    include_llm=include_llm,
+                    detail=FAST_ANALYSIS,
+                ),
             }
 
         bot_player = -player
@@ -172,14 +175,18 @@ class AssistantHandler(BaseHTTPRequestHandler):
         final_moves = next_moves + [bot_move]
         win = winner(board, bot_move)
         current_player = EMPTY if win != EMPTY else player
-        analysis = analyze_game(final_moves, current_player=player, include_llm=include_llm)
+        analysis = analyze_game(
+            final_moves,
+            current_player=player,
+            include_llm=include_llm,
+            detail=FAST_ANALYSIS,
+        )
         return {
             "moves": [move_to_dict(move) for move in final_moves],
             "board": board_to_dict(board),
             "winner": win,
             "current_player": current_player,
             "last_bot_move": move_to_dict(bot_move),
-            "human_analysis": human_analysis,
             "analysis": analysis,
         }
 
