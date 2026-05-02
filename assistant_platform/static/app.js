@@ -592,7 +592,7 @@ function render() {
   });
 }
 
-async function refreshAnalysis(includeLlm = true) {
+async function refreshAnalysis(includeLlm = false) {
   state.analysis = await api("/api/analyze", {
     moves: state.moves,
     current_player: state.currentPlayer || BLACK,
@@ -603,13 +603,18 @@ async function refreshAnalysis(includeLlm = true) {
 
 async function submitMove() {
   try {
+    els.submitMoveBtn.disabled = true;
+    els.submitMoveBtn.textContent = "计算中...";
     const humanPlayer = state.currentPlayer;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     const data = await api("/api/play", {
       moves: state.moves,
       player: humanPlayer,
       stones: state.selected,
-      include_llm: true,
+      include_llm: false,
     });
+    clearTimeout(timeoutId);
     state.moves = data.moves;
     state.board = data.board;
     state.currentPlayer = data.current_player || state.currentPlayer;
@@ -621,6 +626,9 @@ async function submitMove() {
     if (state.winner) showResultOverlay(state.winner, humanPlayer);
   } catch (error) {
     showToast(error.message);
+  } finally {
+    els.submitMoveBtn.disabled = Boolean(state.winner) || state.selected.length !== expectedStones();
+    els.submitMoveBtn.textContent = "提交落子";
   }
 }
 

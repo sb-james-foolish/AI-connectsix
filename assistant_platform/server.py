@@ -130,7 +130,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
         build_board(moves, validate=True)
         current_player = payload.get("current_player")
         current = int(current_player) if current_player is not None else None
-        include_llm = bool(payload.get("include_llm", True))
+        include_llm = bool(payload.get("include_llm", False))
         return analyze_game(moves, current_player=current, include_llm=include_llm)
 
     def _handle_play(self, payload: object) -> dict[str, object]:
@@ -150,7 +150,7 @@ class AssistantHandler(BaseHTTPRequestHandler):
         next_moves = moves + [human_move]
         win = winner(board, human_move)
         human_analysis = analyze_game(next_moves, current_player=-player, include_llm=False)
-        include_llm = bool(payload.get("include_llm", True))
+        include_llm = bool(payload.get("include_llm", False))
 
         if win != EMPTY:
             return {
