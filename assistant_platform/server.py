@@ -78,6 +78,9 @@ class AssistantHandler(BaseHTTPRequestHandler):
         if path == "/":
             self._serve_static("index.html")
             return
+        if path in {"/app.js", "/styles.css"}:
+            self._serve_static(path.removeprefix("/"))
+            return
         if path.startswith("/static/"):
             self._serve_static(path.removeprefix("/static/"))
             return

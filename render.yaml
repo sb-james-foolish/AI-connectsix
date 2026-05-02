@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: connectsix-assistant
+    env: python
+    rootDir: assistant_platform
+    buildCommand: ""
+    startCommand: python server.py --host 0.0.0.0 --port $PORT
+    plan: free

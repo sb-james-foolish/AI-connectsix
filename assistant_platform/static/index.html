@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>弈局 - 六子棋国风AI复盘平台</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <canvas id="spaceCanvas" class="space-canvas" aria-hidden="true"></canvas>
@@ -202,6 +202,10 @@
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="/static/app.js"></script>
+    <script>
+      // 部署到公网后，把这个地址改成你的后端域名，例如 https://connectsix-api.onrender.com
+      window.CONNECTSIX_API_BASE = window.CONNECTSIX_API_BASE || "";
+    </script>
+    <script src="./app.js"></script>
   </body>
 </html>

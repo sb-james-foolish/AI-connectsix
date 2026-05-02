@@ -14,6 +14,8 @@ const state = {
   showHeatmap: false,
 };
 
+const API_BASE = String(window.CONNECTSIX_API_BASE || "").replace(/\/$/, "");
+
 const boardCells = [];
 
 const els = {
@@ -103,7 +105,8 @@ function rebuildBoard() {
 }
 
 async function api(path, payload) {
-  const response = await fetch(path, {
+  const url = /^https?:\/\//i.test(path) ? path : `${API_BASE}${path}`;
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
