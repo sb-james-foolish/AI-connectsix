@@ -271,7 +271,7 @@ def pattern_labels(profiles: list[dict[str, int]], player_text: str) -> list[str
     return labels
 
 
-def point_score(board: list[list[int]], x: int, y: int, player: int) -> dict[str, Any] | None:
+def _legacy_point_score(board: list[list[int]], x: int, y: int, player: int) -> dict[str, Any] | None:
     if not in_board(x, y, len(board)) or board[y][x] != EMPTY:
         return None
 
@@ -322,6 +322,212 @@ def point_score(board: list[list[int]], x: int, y: int, player: int) -> dict[str
     }
 
 
+def _sample_line(board: list[list[int]], x: int, y: int, player: int, dx: int, dy: int, radius: int = 5) -> list[int]:
+    values: list[int] = []
+    for step in range(-radius, radius + 1):
+        cx = x + step * dx
+        cy = y + step * dy
+        if not in_board(cx, cy, len(board)):
+            values.append(2)
+        elif cx == x and cy == y:
+            values.append(player)
+        else:
+            values.append(board[cy][cx])
+    return values
+
+
+def _direction_feature(board: list[list[int]], x: int, y: int, player: int, dx: int, dy: int) -> dict[str, int]:
+    line = _sample_line(board, x, y, player, dx, dy)
+    center = len(line) // 2
+    left = center
+    right = center
+    while left - 1 >= 0 and line[left - 1] == player:
+        left -= 1
+    while right + 1 < len(line) and line[right + 1] == player:
+        right += 1
+
+    run = right - left + 1
+    open_ends = 0
+    if left - 1 >= 0 and line[left - 1] == EMPTY:
+        open_ends += 1
+    if right + 1 < len(line) and line[right + 1] == EMPTY:
+        open_ends += 1
+
+    peak = 0
+    strong_windows = 0
+    winning_windows = 0
+    pressure = 0
+    for start in range(0, len(line) - 5):
+        end = start + 6
+        if not (start <= center < end):
+            continue
+        window = line[start:end]
+        if any(value in {-player, 2} for value in window):
+            continue
+        stones = sum(1 for value in window if value == player)
+        peak = max(peak, stones)
+        if stones >= 5:
+            winning_windows += 1
+        if stones >= 4:
+            strong_windows += 1
+        if stones >= 3:
+            pressure += stones - 2
+
+    bridge = 0
+    if center - 1 >= 0 and center + 1 < len(line) and line[center - 1] == player and line[center + 1] == player:
+        bridge = 1
+
+    return {
+        "run": run,
+        "open_ends": open_ends,
+        "peak": peak,
+        "strong_windows": strong_windows,
+        "winning_windows": winning_windows,
+        "pressure": pressure,
+        "bridge": bridge,
+    }
+
+
+def _direction_value(feature: dict[str, int]) -> int:
+    peak = feature["peak"]
+    run = feature["run"]
+    open_ends = feature["open_ends"]
+    strong_windows = feature["strong_windows"]
+    winning_windows = feature["winning_windows"]
+    pressure = feature["pressure"]
+    bridge = feature["bridge"]
+
+    if peak >= 6:
+        score = 145_000
+    elif peak == 5:
+        score = 58_000
+    elif peak == 4:
+        score = 13_000
+    elif peak == 3:
+        score = 2_600
+    elif peak == 2:
+        score = 420
+    else:
+        score = 28
+
+    if run >= 6:
+        score += 28_000
+    elif run == 5:
+        score += 20_000 if open_ends else 8_000
+    elif run == 4:
+        score += 7_400 if open_ends == 2 else 2_900 if open_ends == 1 else 500
+    elif run == 3:
+        score += 1_400 if open_ends == 2 else 360 if open_ends == 1 else 0
+    elif run == 2:
+        score += 180 if open_ends == 2 else 60
+
+    score += strong_windows * 1_850
+    score += winning_windows * 4_200
+    score += pressure * 180
+    if bridge:
+        score += 1_600
+    return score
+
+
+def _feature_labels(features: list[dict[str, int]], prefix: str) -> list[str]:
+    labels: list[str] = []
+    peak = max((feature["peak"] for feature in features), default=0)
+    if peak >= 6:
+        labels.append(f"{prefix}成六")
+    elif peak == 5:
+        labels.append(f"{prefix}冲六点")
+    elif peak == 4:
+        labels.append(f"{prefix}强扩展")
+
+    if sum(1 for feature in features if feature["peak"] >= 4) >= 2:
+        labels.append(f"{prefix}双线")
+    if any(feature["bridge"] for feature in features):
+        labels.append(f"{prefix}连桥")
+    if any(feature["run"] >= 4 and feature["open_ends"] == 2 for feature in features):
+        labels.append(f"{prefix}活线")
+    return labels
+
+
+def point_score(board: list[list[int]], x: int, y: int, player: int) -> dict[str, Any] | None:
+    if not in_board(x, y, len(board)) or board[y][x] != EMPTY:
+        return None
+
+    attack_features = [_direction_feature(board, x, y, player, dx, dy) for dx, dy in DIRECTIONS]
+    defense_features = [_direction_feature(board, x, y, -player, dx, dy) for dx, dy in DIRECTIONS]
+    attack = sum(_direction_value(feature) for feature in attack_features)
+    defense = sum(_direction_value(feature) for feature in defense_features)
+
+    attack_peak = max((feature["peak"] for feature in attack_features), default=0)
+    defense_peak = max((feature["peak"] for feature in defense_features), default=0)
+    attack_forks = sum(1 for feature in attack_features if feature["peak"] >= 4)
+    defense_forks = sum(1 for feature in defense_features if feature["peak"] >= 4)
+    if attack_forks >= 2:
+        attack += 11_000 + attack_forks * 2_400
+    if defense_forks >= 2:
+        defense += 15_000 + defense_forks * 3_200
+    if defense_peak >= 6:
+        defense += 58_000
+    elif defense_peak == 5:
+        defense += 18_000
+
+    attack_labels = _feature_labels(attack_features, "进攻")
+    defense_labels = _feature_labels(defense_features, "防守")
+    if defense_peak >= 6:
+        defense_labels.append("必须防守")
+
+    center = (len(board) - 1) / 2
+    dist = abs(x - center) + abs(y - center)
+    center_bonus = max(0, int(90 - dist * 10))
+
+    neighbor_bonus = 0
+    for yy in range(max(0, y - 2), min(len(board), y + 3)):
+        for xx in range(max(0, x - 2), min(len(board), x + 3)):
+            if xx == x and yy == y:
+                continue
+            if board[yy][xx] == player:
+                neighbor_bonus += 18
+            elif board[yy][xx] == -player:
+                neighbor_bonus += 11
+
+    role = "balance"
+    if defense_peak >= 6:
+        role = "block"
+    elif attack_peak >= 6:
+        role = "win"
+    elif attack_forks >= 2 or defense_forks >= 2:
+        role = "fork"
+    elif attack > defense * 1.2:
+        role = "attack"
+    elif defense > attack * 1.2:
+        role = "defense"
+
+    total = int(attack + defense * 0.98 + center_bonus + neighbor_bonus)
+    labels = attack_labels + defense_labels
+    if center_bonus >= 60:
+        labels.append("中腹效率")
+    if neighbor_bonus >= 70:
+        labels.append("局部联动")
+    if not labels:
+        labels.append("稳健扩张")
+
+    return {
+        "x": x,
+        "y": y,
+        "score": total,
+        "attack": int(attack),
+        "defense": int(defense),
+        "center": center_bonus,
+        "labels": labels[:5],
+        "role": role,
+        "attack_forks": attack_forks,
+        "defense_forks": defense_forks,
+        "attack_peak": attack_peak,
+        "defense_peak": defense_peak,
+        "max_attack_line": attack_peak,
+        "max_defense_line": defense_peak,
+    }
+
+
 def heatmap_for(
     board: list[list[int]],
     player: int,
@@ -341,9 +547,9 @@ def heatmap_for(
     for cell in cells:
         heat = (cell["score"] - min_score) / span
         cell["heat"] = round(heat, 4)
-        if "必须防守" in cell["labels"] or "进攻成六" in cell["labels"]:
+        if cell.get("defense_peak", 0) >= 6 or cell.get("attack_peak", 0) >= 6:
             cell["level"] = "critical"
-        elif heat >= 0.72:
+        elif cell.get("attack_forks", 0) >= 2 or cell.get("defense_forks", 0) >= 2 or heat >= 0.72:
             cell["level"] = "strong"
         elif heat >= 0.42:
             cell["level"] = "useful"

@@ -25,6 +25,8 @@ const els = {
   selectionText: document.getElementById("selectionText"),
   submitMoveBtn: document.getElementById("submitMoveBtn"),
   heatmapToggle: document.getElementById("heatmapToggle"),
+  heatLegend: document.getElementById("heatLegend"),
+  heatInsight: document.getElementById("heatInsight"),
   newGameBtn: document.getElementById("newGameBtn"),
   undoBtn: document.getElementById("undoBtn"),
   exportBtn: document.getElementById("exportBtn"),
@@ -173,6 +175,14 @@ function heatMap() {
   return map;
 }
 
+function hotRankMap() {
+  const map = new Map();
+  for (const [index, cell] of (state.analysis?.top_candidates || []).slice(0, 8).entries()) {
+    map.set(pointKey(cell.x, cell.y), index + 1);
+  }
+  return map;
+}
+
 function recommendationSet() {
   const set = new Set();
   for (const stone of state.analysis?.recommendation?.stones || []) {
@@ -197,9 +207,38 @@ function isStarPoint(x, y) {
   return [3, 7, 11].includes(x) && [3, 7, 11].includes(y);
 }
 
+function roleText(role) {
+  return {
+    win: "直接进攻",
+    block: "必须防守",
+    fork: "双线关键",
+    attack: "进攻扩张",
+    defense: "防守压制",
+    balance: "平衡抢位",
+  }[role] || "综合判断";
+}
+
+function heatClass(role) {
+  return {
+    win: "heat-win",
+    block: "heat-block",
+    fork: "heat-fork",
+    attack: "heat-attack",
+    defense: "heat-defense",
+    balance: "heat-balance",
+  }[role] || "heat-balance";
+}
+
+function cellHint(cell) {
+  if (!cell) return "";
+  const labels = (cell.labels || []).slice(0, 3).join(" / ");
+  return `(${cell.x},${cell.y}) ${roleText(cell.role)} · 攻${cell.attack_peak || 0} 防${cell.defense_peak || 0}${labels ? ` · ${labels}` : ""}`;
+}
+
 function renderBoard() {
   const heat = state.showHeatmap ? heatMap() : new Map();
   const recommended = state.showHeatmap ? recommendationSet() : new Set();
+  const hotRanks = state.showHeatmap ? hotRankMap() : new Map();
   const selected = selectedSet();
   const bot = lastBotSet();
   if (!boardCells.length) {
@@ -226,14 +265,35 @@ function renderBoard() {
       cell.classList.toggle("selected", false);
       cell.classList.toggle("recommended", false);
       cell.classList.toggle("last-bot", false);
+      cell.classList.toggle("hotspot", false);
+      cell.classList.remove("heat-win", "heat-block", "heat-fork", "heat-attack", "heat-defense", "heat-balance");
       cell.style.removeProperty("--heat");
+      cell.style.removeProperty("--rank-scale");
+      cell.removeAttribute("title");
+      delete cell.dataset.rank;
       const key = pointKey(x, y);
       const heatCell = heat.get(key);
-      if (heatCell && state.board[y][x] === EMPTY) {
-        const visibleHeat = heatCell.level === "critical"
-          ? Math.max(0.8, heatCell.heat * 0.95)
-          : Math.max(0.22, heatCell.heat * 0.9);
+      const rank = hotRanks.get(key);
+      if (heatCell && state.board[y][x] === EMPTY && (heatCell.level !== "quiet" || rank)) {
+        let visibleHeat = 0;
+        if (heatCell.level === "critical") {
+          visibleHeat = Math.max(0.98, heatCell.heat);
+        } else if (heatCell.level === "strong") {
+          visibleHeat = Math.max(0.78, heatCell.heat * 0.98);
+        } else if (heatCell.level === "useful") {
+          visibleHeat = Math.max(0.48, heatCell.heat * 0.82);
+        } else {
+          visibleHeat = Math.max(0.26, heatCell.heat * 0.72);
+        }
         cell.style.setProperty("--heat", String(Math.min(1, visibleHeat)));
+        cell.classList.add(heatClass(heatCell.role));
+        cell.title = cellHint(heatCell);
+        if (rank) {
+          cell.classList.add("hotspot");
+          cell.dataset.rank = String(rank);
+          const rankScale = rank === 1 ? 1 : rank <= 3 ? 0.88 : 0.76;
+          cell.style.setProperty("--rank-scale", String(rankScale));
+        }
       }
       if (recommended.has(key) && state.board[y][x] === EMPTY) cell.classList.add("recommended");
       if (selected.has(key)) cell.classList.add("selected");
@@ -251,6 +311,16 @@ function renderBoard() {
       } else if (cell.firstChild) {
         cell.innerHTML = "";
       }
+      if (state.board[y][x] === EMPTY && rank) {
+        const marker = document.createElement("span");
+        marker.className = "heat-marker";
+        marker.setAttribute("aria-hidden", "true");
+        marker.textContent = String(rank);
+        cell.appendChild(marker);
+      }
+      if (!cell.title) {
+        cell.title = `坐标 (${x},${y})`;
+      }
     }
   }
 }
@@ -258,6 +328,35 @@ function renderBoard() {
 function renderModeToggle() {
   els.heatmapToggle.classList.toggle("active", state.showHeatmap);
   els.heatmapToggle.setAttribute("aria-pressed", state.showHeatmap ? "true" : "false");
+}
+
+function renderHeatMeta() {
+  if (!els.heatLegend || !els.heatInsight) return;
+  els.heatLegend.innerHTML = "";
+  if (!state.showHeatmap) {
+    els.heatInsight.textContent = "开启 AI 热力图后，可以看到进攻点、必防点和双线关键点。";
+    return;
+  }
+
+  const legendItems = [
+    ["heat-win", "直接进攻"],
+    ["heat-block", "必须防守"],
+    ["heat-fork", "双线关键"],
+    ["heat-attack", "进攻扩张"],
+    ["heat-defense", "防守压制"],
+  ];
+  for (const [cls, label] of legendItems) {
+    const item = document.createElement("span");
+    item.className = `heat-chip ${cls}`;
+    item.textContent = label;
+    els.heatLegend.appendChild(item);
+  }
+
+  const top = (state.analysis?.top_candidates || [])[0];
+  const criticalCount = (state.analysis?.heatmap || []).filter((cell) => cell.level === "critical").length;
+  els.heatInsight.textContent = top
+    ? `优先关注 ${cellHint(top)}。${criticalCount ? ` 当前有 ${criticalCount} 个关键点需要先看。` : ""}`
+    : "当前没有可展示的热点。";
 }
 
 function setGauge(gauge, text, value, label) {
@@ -348,7 +447,14 @@ function renderOverview() {
   for (const cell of (analysis.top_candidates || []).slice(0, 8)) {
     const item = document.createElement("div");
     item.className = "candidate";
-    item.innerHTML = `<strong>(${cell.x},${cell.y})</strong><span>${(cell.labels || []).slice(0, 2).join(" / ")}</span><b>${cell.score}</b>`;
+    const detail = [
+      roleText(cell.role),
+      `攻${cell.attack_peak || 0}`,
+      `防${cell.defense_peak || 0}`,
+      ...(cell.labels || []).slice(0, 1),
+    ].join(" / ");
+    item.innerHTML = `<strong>(${cell.x},${cell.y})</strong><span>${detail}</span><b>${cell.score}</b>`;
+    item.title = cellHint(cell);
     els.candidateList.appendChild(item);
   }
 
@@ -572,6 +678,7 @@ function renderJson() {
 
 function renderCore() {
   renderModeToggle();
+  renderHeatMeta();
   renderBoard();
   renderStatus();
 }

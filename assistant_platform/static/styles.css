@@ -276,6 +276,7 @@ button:disabled {
   place-items: center;
   min-height: 0;
   padding: clamp(18px, 2.3vw, 36px);
+  padding-top: clamp(148px, 18vw, 178px);
   overflow: hidden;
 }
 
@@ -333,6 +334,58 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.heat-meta {
+  position: absolute;
+  top: 118px;
+  left: 20px;
+  right: 20px;
+  z-index: 8;
+  display: grid;
+  gap: 8px;
+}
+
+.heat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.heat-chip,
+.heat-insight {
+  border: 1px solid rgba(128, 100, 72, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 250, 242, 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.heat-chip {
+  --heat-rgb: 110, 40, 32;
+  position: relative;
+  padding: 7px 10px 7px 28px;
+  color: var(--ink);
+  font: 700 12px "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.heat-chip::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: rgba(var(--heat-rgb), 0.74);
+  box-shadow: 0 0 0 3px rgba(var(--heat-rgb), 0.14);
+}
+
+.heat-insight {
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .mode-toggle {
@@ -418,6 +471,7 @@ button:disabled {
 
 .cell {
   --heat: 0;
+  --heat-rgb: 110, 40, 32;
   --star-size: 0px;
   position: relative;
   display: grid;
@@ -459,12 +513,59 @@ button:disabled {
 .cell::after {
   content: "";
   position: absolute;
-  inset: 12%;
+  inset: 9%;
   border-radius: 50%;
   opacity: var(--heat);
-  background: radial-gradient(circle at center, rgba(110, 40, 32, 0.28), rgba(110, 40, 32, 0.12) 48%, transparent 72%);
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06) 28%, transparent 34%),
+    radial-gradient(circle at center, rgba(var(--heat-rgb), 0.62), rgba(var(--heat-rgb), 0.22) 48%, transparent 76%);
   pointer-events: none;
   z-index: 1;
+  transform: scale(1.08);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.cell.hotspot::after {
+  inset: 2%;
+  opacity: 1;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12) 22%, transparent 30%),
+    radial-gradient(circle at center, rgba(var(--heat-rgb), 0.82), rgba(var(--heat-rgb), 0.28) 54%, transparent 78%);
+  box-shadow:
+    0 0 0 2px rgba(var(--heat-rgb), 0.4),
+    0 0 24px rgba(var(--heat-rgb), 0.46),
+    inset 0 0 14px rgba(255, 255, 255, 0.16);
+  transform: scale(1.14);
+}
+
+.cell.heat-win,
+.heat-chip.heat-win {
+  --heat-rgb: 163, 61, 47;
+}
+
+.cell.heat-block,
+.heat-chip.heat-block {
+  --heat-rgb: 36, 98, 176;
+}
+
+.cell.heat-fork,
+.heat-chip.heat-fork {
+  --heat-rgb: 44, 133, 95;
+}
+
+.cell.heat-attack,
+.heat-chip.heat-attack {
+  --heat-rgb: 176, 102, 33;
+}
+
+.cell.heat-defense,
+.heat-chip.heat-defense {
+  --heat-rgb: 88, 110, 162;
+}
+
+.cell.heat-balance,
+.heat-chip.heat-balance {
+  --heat-rgb: 121, 88, 58;
 }
 
 .cell.recommended::after {
@@ -512,6 +613,32 @@ button:disabled {
 .cell.selected,
 .cell.last-bot {
   overflow: visible;
+}
+
+.heat-marker {
+  --rank-scale: 0.8;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: clamp(19px, 2vw, 24px);
+  height: clamp(19px, 2vw, 24px);
+  color: #fffdf8;
+  font: 800 12px/1 Consolas, monospace;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(var(--heat-rgb), 0.92);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.18),
+    0 0 22px rgba(var(--heat-rgb), 0.52);
+  transform: translate(-50%, -50%) scale(var(--rank-scale));
+  pointer-events: none;
+}
+
+.cell.hotspot:hover .heat-marker {
+  transform: translate(-50%, -50%) scale(calc(var(--rank-scale) + 0.08));
 }
 
 .stone {
