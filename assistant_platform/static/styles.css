@@ -37,7 +37,7 @@ textarea {
   font: inherit;
 }
 
-button {
+button:not(.cell) {
   min-height: 38px;
   border: 1px solid rgba(121, 88, 58, 0.26);
   border-radius: 10px;
@@ -51,17 +51,17 @@ button {
   transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
-button:hover {
+button:not(.cell):hover {
   transform: translateY(-1px);
   border-color: rgba(121, 88, 58, 0.42);
   box-shadow: 0 12px 20px rgba(58, 43, 29, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
-button:active {
+button:not(.cell):active {
   transform: translateY(0) scale(0.99);
 }
 
-button:disabled {
+button:not(.cell):disabled {
   color: rgba(42, 32, 26, 0.42);
   border-color: rgba(121, 88, 58, 0.14);
   box-shadow: none;
@@ -273,10 +273,11 @@ button:disabled {
 .board-stage {
   position: relative;
   display: grid;
-  place-items: center;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  align-items: start;
   min-height: 0;
-  padding: clamp(18px, 2.3vw, 36px);
-  padding-top: clamp(148px, 18vw, 178px);
+  padding: clamp(18px, 2.3vw, 28px);
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -302,10 +303,7 @@ button:disabled {
 }
 
 .board-stage-header {
-  position: absolute;
-  top: 18px;
-  left: 20px;
-  right: 20px;
+  position: relative;
   z-index: 6;
   display: flex;
   align-items: flex-start;
@@ -327,20 +325,16 @@ button:disabled {
 }
 
 .board-tools {
-  position: absolute;
-  top: 74px;
-  left: 20px;
+  position: relative;
   z-index: 8;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .heat-meta {
-  position: absolute;
-  top: 118px;
-  left: 20px;
-  right: 20px;
+  position: relative;
   z-index: 8;
   display: grid;
   gap: 8px;
@@ -424,49 +418,66 @@ button:disabled {
 
 .holo-ring {
   position: absolute;
-  width: min(78vh, 76vw, 820px);
+  left: 50%;
+  top: 54%;
+  width: min(72vh, 72vw, 760px);
   aspect-ratio: 1;
   border-radius: 50%;
+  transform: translate(-50%, -50%);
   pointer-events: none;
   background:
     conic-gradient(from 0deg, transparent 0 12%, rgba(79, 143, 109, 0.92) 14%, transparent 16% 38%, rgba(163, 61, 47, 0.75) 41%, transparent 44% 74%, rgba(79, 143, 109, 0.75) 78%, transparent 80%);
-  opacity: 0.18;
+  opacity: 0.12;
 }
 
 .board {
-  --size: min(75vh, 100%, 790px);
-  --board-pad: clamp(18px, 2.2vw, 30px);
+  --size: min(100%, 720px, calc(100vh - 390px));
+  --board-pad: clamp(18px, 2vw, 26px);
   position: relative;
   z-index: 2;
   width: var(--size);
+  max-height: 100%;
   aspect-ratio: 1;
+  place-self: center;
   display: grid;
   grid-template-columns: repeat(15, 1fr);
   grid-template-rows: repeat(15, 1fr);
   padding: var(--board-pad);
-  border: 1px solid rgba(120, 89, 60, 0.28);
-  border-radius: 20px;
+  border: 1px solid rgba(126, 89, 51, 0.34);
+  border-radius: 28px;
   background:
-    radial-gradient(circle at 50% 50%, rgba(61, 71, 56, 0.04), transparent 54%),
-    linear-gradient(180deg, rgba(219, 190, 146, 0.96), rgba(203, 161, 110, 0.97) 48%, rgba(189, 142, 90, 0.98));
+    radial-gradient(circle at 50% 54%, rgba(91, 62, 35, 0.08), transparent 56%),
+    linear-gradient(180deg, rgba(229, 199, 149, 0.98), rgba(212, 171, 112, 0.99) 44%, rgba(190, 143, 86, 0.99));
   box-shadow:
-    0 10px 22px rgba(83, 59, 37, 0.09),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
-    inset 0 0 12px rgba(95, 67, 41, 0.06);
+    0 24px 48px rgba(88, 62, 37, 0.18),
+    inset 0 0 0 1px rgba(255, 246, 228, 0.22),
+    inset 0 0 22px rgba(104, 72, 43, 0.08);
   user-select: none;
 }
 
 .board::before {
   content: "";
   position: absolute;
-  inset: var(--board-pad);
-  border-radius: 14px;
+  inset: 12px;
+  border-radius: 20px;
   pointer-events: none;
   background:
-    linear-gradient(0deg, rgba(0, 0, 0, 0.012), rgba(0, 0, 0, 0.012)),
-    radial-gradient(circle at 12% 16%, rgba(71, 56, 44, 0.04), transparent 18%),
-    radial-gradient(circle at 84% 78%, rgba(71, 56, 44, 0.03), transparent 16%);
-  opacity: 0.72;
+    repeating-linear-gradient(12deg, rgba(126, 89, 51, 0.028) 0 10px, rgba(255, 255, 255, 0.02) 10px 20px),
+    radial-gradient(circle at 12% 16%, rgba(77, 58, 42, 0.05), transparent 18%),
+    radial-gradient(circle at 84% 78%, rgba(77, 58, 42, 0.04), transparent 16%);
+  opacity: 0.78;
+}
+
+.board::after {
+  content: "";
+  position: absolute;
+  inset: var(--board-pad);
+  border-radius: 18px;
+  border: 1px solid rgba(109, 76, 46, 0.26);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 234, 0.18),
+    0 0 0 1px rgba(145, 108, 67, 0.08);
+  pointer-events: none;
 }
 
 .cell {
@@ -480,17 +491,25 @@ button:disabled {
   min-height: 0;
   padding: 0;
   border: 0;
+  border-radius: 0;
   outline: 0;
   appearance: none;
   background: transparent;
+  box-shadow: none;
   isolation: isolate;
   cursor: pointer;
 }
 
 .cell:hover {
   z-index: 5;
-  background: radial-gradient(circle, rgba(38, 33, 28, 0.18), transparent 58%);
-  filter: drop-shadow(0 0 10px rgba(38, 33, 28, 0.28));
+  transform: none;
+  background: radial-gradient(circle, rgba(72, 56, 42, 0.16), transparent 56%);
+  box-shadow: none;
+  filter: none;
+}
+
+.cell:active {
+  transform: none;
 }
 
 .cell::before {
@@ -498,10 +517,10 @@ button:disabled {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(72, 57, 45, 0.42) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
-    linear-gradient(0deg, transparent calc(50% - 0.5px), rgba(72, 57, 45, 0.42) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
-    radial-gradient(circle at center, rgba(163, 61, 47, 0.72) 0 2px, transparent 3px),
-    radial-gradient(circle at center, rgba(163, 61, 47, 0.64) 0 var(--star-size), transparent calc(var(--star-size) + 1px));
+    linear-gradient(90deg, transparent calc(50% - 0.7px), rgba(88, 61, 37, 0.5) calc(50% - 0.7px) calc(50% + 0.7px), transparent calc(50% + 0.7px)),
+    linear-gradient(0deg, transparent calc(50% - 0.7px), rgba(88, 61, 37, 0.5) calc(50% - 0.7px) calc(50% + 0.7px), transparent calc(50% + 0.7px)),
+    radial-gradient(circle at center, rgba(150, 65, 43, 0.76) 0 2px, transparent 3px),
+    radial-gradient(circle at center, rgba(150, 65, 43, 0.68) 0 var(--star-size), transparent calc(var(--star-size) + 1px));
   pointer-events: none;
   z-index: 0;
 }
